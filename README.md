@@ -381,3 +381,80 @@ After defining this structure:
 - Use select boxes for options that come from configuration (comma-separated lists).
 - Persist sensitive values like API keys in st.session_state for the running session.
 - Keep frontend responsibilities to UI rendering / capturing selections; backend orchestration lives in main.py and graph modules.
+
+-----------------------------------------------
+
+# LLM Model Integration — Grok (LangChain)
+
+## Overview
+
+This module is responsible for loading the selected LLM dynamically based on the **user inputs captured from the Streamlit frontend**.
+
+The frontend collects:
+- Selected LLM
+- Selected model
+- API key
+
+These values are stored inside `user_controls` and passed to the LLM loader module.
+
+This module reads those controls and initializes the corresponding LLM instance using `langchain_groq`.
+
+---
+
+# Objective
+
+- Read API key from Streamlit user controls
+- Read selected model from user controls
+- Validate API key availability
+- Initialize the Grok LLM using LangChain
+- Return the LLM instance for workflow execution
+
+---
+
+# File Structure
+LLMs/
+└── groqllm.py
+
+This file contains the class responsible for loading Groq LLM.
+
+---
+
+# Dependencies
+
+The following libraries are required:
+
+```python
+import os
+import streamlit as st
+from langchain_groq import ChatGroq
+```
+
+- `os` → Used for environment variable handling
+- `streamlit` → Used to access user controls and show errors
+- `ChatGroq` → LangChain wrapper for Grok LLM
+
+- User controls are created in: `ui/streamlit/load_ui.py`
+- They include: `{ "grok_api_key": "...", "selected_grok_model": "...", ...}`
+        - These controls are passed to the LLM loader class as input.
+
+## Class Design
+- Class: `GroqLLM`
+- Encapsulates Grok LLM loading logic in a modular way.
+
+## Model Loading Method
+- Method: `get_llm_model()`
+- Loads the Grok LLM based on:
+        - API key
+        - Selected model
+- `if groq_api_key=='' and os.environ("GROQ_API_KEY") == '':` Why `and` condition:
+- "API key must be provided via UI OR it must exist as environment variable"
+
+| UI Key       | ENV Key      | Condition Result | Behavior  |
+| ------------ | ------------ | ---------------- | --------- |
+| Provided     | Not Provided | ❌ False          | ✅ Allowed |
+| Not Provided | Provided     | ❌ False          | ✅ Allowed |
+| Provided     | Provided     | ❌ False          | ✅ Allowed |
+| Not Provided | Not Provided | ✅ True           | ❌ Error   |
+
+
+-------------------------------------------------------------------
