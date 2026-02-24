@@ -345,7 +345,7 @@ After defining this structure:
 
 - ui_config.ini — configuration file containing constants used by the UI (page title, LM options, use-case options, model lists).
 
-- ui_config_file.py — module that reads ui_config.ini using ConfigParser and exposes getter methods (get_lm_options, get_usecase_options, get_grok_model_options, get_page_title, etc.).
+- ui_config_file.py — module that reads ui_config.ini using ConfigParser and exposes getter methods (get_lm_options, get_usecase_options, get_groq_model_options, get_page_title, etc.).
 
 - load_ui.py — contains LoadStreamlitUI class which:
 
@@ -366,7 +366,7 @@ After defining this structure:
 - LoadStreamlitUI returns user_controls to main.py.
 - main.py shows the user message input box (Streamlit text input).
 - When the user enters a message and submits:
-        - `main.py` will validate required selections (e.g., API key for grok).
+        - `main.py` will validate required selections (e.g., API key for groq).
         - The app loads the selected LLM adapter (the LLM is configured via llms/ module, not detailed here).
         - main.py triggers the LangGraph workflow by passing the message + user_controls into the graph orchestration layer.
 - The graph (nodes + edges + state) executes and returns a response.
@@ -384,7 +384,7 @@ After defining this structure:
 
 -----------------------------------------------
 
-# LLM Model Integration — Grok (LangChain)
+# LLM Model Integration — Groq (LangChain)
 
 ## Overview
 
@@ -401,17 +401,17 @@ This module reads those controls and initializes the corresponding LLM instance 
 
 ---
 
-# Objective
+## Objective
 
 - Read API key from Streamlit user controls
 - Read selected model from user controls
 - Validate API key availability
-- Initialize the Grok LLM using LangChain
+- Initialize the Groq LLM using LangChain
 - Return the LLM instance for workflow execution
 
 ---
 
-# File Structure
+## File Structure
 LLMs/
 └── groqllm.py
 
@@ -419,7 +419,7 @@ This file contains the class responsible for loading Groq LLM.
 
 ---
 
-# Dependencies
+## Dependencies
 
 The following libraries are required:
 
@@ -431,19 +431,19 @@ from langchain_groq import ChatGroq
 
 - `os` → Used for environment variable handling
 - `streamlit` → Used to access user controls and show errors
-- `ChatGroq` → LangChain wrapper for Grok LLM
+- `ChatGroq` → LangChain wrapper for Groq LLM
 
 - User controls are created in: `ui/streamlit/load_ui.py`
-- They include: `{ "grok_api_key": "...", "selected_grok_model": "...", ...}`
+- They include: `{ "groq_api_key": "...", "selected_groq_model": "...", ...}`
         - These controls are passed to the LLM loader class as input.
 
 ## Class Design
 - Class: `GroqLLM`
-- Encapsulates Grok LLM loading logic in a modular way.
+- Encapsulates Groq LLM loading logic in a modular way.
 
 ## Model Loading Method
 - Method: `get_llm_model()`
-- Loads the Grok LLM based on:
+- Loads the Groq LLM based on:
         - API key
         - Selected model
 - `if groq_api_key=='' and os.environ("GROQ_API_KEY") == '':` Why `and` condition:
@@ -457,4 +457,155 @@ from langchain_groq import ChatGroq
 | Not Provided | Not Provided | ✅ True           | ❌ Error   |
 
 
+-------------------------------------------------------------------
+
+# Graph Builder Module — README
+
+## Overview
+
+- This module implements the **workflow / graph** layer of the End-to-End Agentic AI project.  
+- After implementing the LLM loader and the Streamlit UI, the next step is to construct the graph that orchestrates nodes (functional components) and edges (control flow) to implement the chatbot use case.
+
+- The first implemented workflow is the **Basic Chatbot**:
+
+```bash
+Start → Chatbot Node → End
+```
+
+- Nodes contain behavior (take input, call the LLM, produce a response). 
+- The graph orchestrates node execution and shares data via a centralized state.
+
+---
+
+## Goals & Responsibilities
+
+- Build a **GraphBuilder** that can programmatically assemble the workflow graph.
+- Initialize and attach the loaded LLM to the graph execution context.
+- Initialize and provide the **state** object that is shared across nodes.
+- Define node registration (add_node) and edges (add_edge) for Start → Node → End flows.
+- Keep node implementations modular in the `nodes/` folder (e.g., `basic_chatbot_node.py`) so each use case can be added independently.
+
+---
+
+## File Organization (recommended from transcript)
+src/
+└── landgraf_agentic_ai/
+    └──graph/
+    │  └── graph_builder.py # GraphBuilder class (this module)
+    ├── state/
+    │   ├── init.py
+    │   └── state.py # State Pydantic/type definitions & reducers
+    ├── nodes/
+    │   ├── init.py
+    │   └── basic_chatbot_node.py # Basic chatbot node implementation
+    ├── llms/
+    │   └── grok_lm.py # (already implemented)
+    ├── ui/
+    │   └── ... # Streamlit UI modules
+    └── main.py # Orchestration entry (calls GraphBuilder)
+
+
+
+---
+
+## Key Concepts & Definitions
+
+### Graph
+- A representation of the workflow composed of **nodes** (functional units) and **edges** (connections / control flow).
+- For the basic chatbot graph: `Start → Chatbot → End`.
+
+### Node
+- Encapsulates a discrete operation (e.g., receive input, call LLM, format response).
+- Implemented as independent modules under `nodes/`.
+- Node functions accept inputs (including state and LLM) and return outputs or update shared state.
+
+### Edge
+- A directed connection between nodes that determines execution order.
+- May be conditional (if/else routing) in more complex workflows.
+
+### State
+- A shared, structured object accessible to all nodes during graph execution.
+- Used to preserve conversation context, messages, metadata between nodes.
+- Typically implemented using typed structures (Pydantic models or typed dicts) and reducers to append/modify state safely.
+
+---
+
+## `state/state.py` (technical definition)
+
+- Purpose: define the structure of the state object shared by the graph and nodes.
+- Suggested:
+
+```python
+  from typing_extensions import TypedDict,List
+  from typing import Annotated
+  from collections import deque
+  # Optional: from pydantic import BaseModel (if using Pydantic)
+  from langgraph.graph.message import add_messages
+```
+
+- `message` is a list (or deque) that reducers append to (not replace).
+- Reducers (imported from LangGraph utilities in transcript) will append messages into the state.
+- It emphasizes using typed structures and reducers so that state updates append instead of replacing lists.
+
+## `graph_builder.py` — GraphBuilder
+
+### Purpose
+
+- Create and own the graph instance.
+- Accept the already-loaded LLM model and the state object.
+- Register nodes and edges to construct the workflow.
+- Provide an API like build_basic_chatbot() to create the Start → Chatbot → End graph.
+
+### Key responsibilities 
+
+- `__init__(self, model)`
+        - `self.llm = model` (LM passed when graph execution is triggered)
+        - `self.graph_builder = <state_graph_instance>` (initialize the graph object)
+        - Initialize or import the shared state class and instantiate state for the graph.
+
+- Create the state graph instance and bind state:
+        - Import state_graph, start, end.
+        - Create the state instance from state/state.py and associate it with the graph builder.
+
+- Provide graph-building methods:
+        - `basic_chatbot_build_graph(self)` — method to build the simple chatbot graph:
+        - Add nodes: `self.graph_builder.add_node("chatbot", functionality=...)`
+        - Add edges: 
+                - `self.graph_builder.add_edge(START, "chatbot")`
+                - `self.graph_builder.add_edge("chatbot", END)`
+
+- Node integrations:
+        - The node functionality is implemented in `nodes/basic_chatbot_node.py`.
+        - GraphBuilder registers the node (by name/identifier) and the associated function.
+
+- `nodes/basic_chatbot_node.py` 
+
+- Purpose: implement the chatbot node logic (accept user input, call LLM, update state, return response).
+- Minimal chatbot node should:
+        - Accept input (prompt/message)
+        - Use the loaded LM to generate a response
+        - Append messages to the state (using reducers)
+        - Return or store the response to be read by the graph’s End node
+
+## How GraphBuilder & Nodes are Wired (execution flow)
+
+- Front-end collects user input and selected model (UI → `user_controls`).
+- LLM loader (e.g., `GroqLLM`) initializes the model instance and returns it.
+- GraphBuilder is instantiated with that LLM:
+        - `graph_builder` = `GraphBuilder(model=llm)`
+- GraphBuilder initializes the graph and state, and then calls a build method:
+        - `graph_builder.basic_chatbot_build_graph()`
+- Main orchestration triggers the graph execution (e.g., `graph_builder.execute(start_payload)`), which:
+        - Sends the input to the start node
+        - Graph traverses edges to the chatbot node
+        - Chatbot node calls LM and updates the shared state
+        - End node finalizes execution and returns output
+- Main or a `display_result` module renders the response in the UI.
+
+## Summary
+
+- The Graph Builder module constructs the execution graph for chatbot workflows.
+- It accepts a loaded LLM and a state object, registers nodes and edges, and provides methods to build use-case graphs (starting with the Basic Chatbot).
+- Node implementations live in `nodes/` and should be modular and simple: take input, call the LM, update shared state, and return responses.
+- The graph + state + LLM combination enables pipeline-style execution (Start → Node(s) → End) rather than ad-hoc notebook-style runs.
 -------------------------------------------------------------------
