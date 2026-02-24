@@ -487,7 +487,7 @@ Start → Chatbot Node → End
 
 ---
 
-## File Organization (recommended from transcript)
+## File Organization 
 src/
 └── landgraf_agentic_ai/
     └──graph/
@@ -544,7 +544,7 @@ src/
 ```
 
 - `message` is a list (or deque) that reducers append to (not replace).
-- Reducers (imported from LangGraph utilities in transcript) will append messages into the state.
+- Reducers (imported from LangGraph utilities) will append messages into the state.
 - It emphasizes using typed structures and reducers so that state updates append instead of replacing lists.
 
 ## `graph_builder.py` — GraphBuilder
