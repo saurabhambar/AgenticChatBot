@@ -412,8 +412,12 @@ This module reads those controls and initializes the corresponding LLM instance 
 ---
 
 ## File Structure
+
+```
 LLMs/
 └── groqllm.py
+
+```
 
 This file contains the class responsible for loading Groq LLM.
 
@@ -488,6 +492,8 @@ Start → Chatbot Node → End
 ---
 
 ## File Organization 
+
+```
 src/
 └── landgraf_agentic_ai/
     └──graph/
@@ -503,7 +509,7 @@ src/
     ├── ui/
     │   └── ... # Streamlit UI modules
     └── main.py # Orchestration entry (calls GraphBuilder)
-
+```
 
 
 ---
@@ -642,7 +648,7 @@ src/
 ---
 
 ## File Location:
-
+```
 src/
 └── landgraf_agentic_ai/
     └──graph/
@@ -660,7 +666,7 @@ src/
     ├── ui/
     │   └── streamlit/ # Streamlit UI modules (load_ui.py etc.)
     └── main.py # Orchestration entry (calls GraphBuilder)
-
+```
 
 
 ---
