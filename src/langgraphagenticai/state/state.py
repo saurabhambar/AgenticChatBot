@@ -7,5 +7,5 @@ class State(TypedDict): # use TypeDict / Pydantic if preferred
     Represent the structure of the state used in graph
     """
     # represents the state structure used in graph
-    message: Annotated[list,add_messages]  # list / deque of messages
+    messages: Annotated[list,add_messages]  # list / deque of messages
     

@@ -609,3 +609,134 @@ src/
 - Node implementations live in `nodes/` and should be modular and simple: take input, call the LM, update shared state, and return responses.
 - The graph + state + LLM combination enables pipeline-style execution (Start → Node(s) → End) rather than ad-hoc notebook-style runs.
 -------------------------------------------------------------------
+
+# Node Implementation Module
+
+## Overview
+
+- This module implements the **node definitions** for the Basic Chatbot workflow in the End-to-End Agentic AI project.  
+
+- The graph orchestration is built with :contentReference[oaicite:0]{index=0}, and the UI is driven by :contentReference[oaicite:1]{index=1}.  
+
+- We have already:
+        - Implemented the Graph Builder and created a simple Basic Chatbot graph (`Start → Chatbot → End`)  
+        - Implemented the LLM loader (Gro1 or other LLMs)  
+        - Built the Streamlit UI to collect `user_controls`
+
+- This Node Implementation module completes the loop by providing the chatbot node logic that:
+        - Accepts input (from state)
+        - Invokes the loaded LLM
+        - Updates shared state
+        - Returns the response to the graph / UI
+
+## Goals & Responsibilities
+
+- Implement a **BasicChatbotNode** class that encapsulates chatbot behavior.
+- Provide a `process(state: State) -> dict` method (returns a dict) that:
+  - Reads conversation input from the shared `state`
+  - Calls the loaded LLM to generate a response
+  - Appends/updates the `state` with the new message(s)
+  - Returns output (usually the messages) for downstream consumption
+- Ensure the node is modular and easily reusable by the GraphBuilder.
+
+---
+
+## File Location:
+
+src/
+└── landgraf_agentic_ai/
+    └──graph/
+    │  ├── init.py
+    │  └── graph_builder.py       # GraphBuilder wires nodes into the graph
+    ├── state/
+    │   ├── init.py
+    │   └── state.py              # Shared state definition (message list, reducers)
+    ├── nodes/
+    │   ├── init.py
+    │   └── basic_chatbot_node.py # Node implementation (this module)
+    ├── llms/
+    │   ├── init.py
+    │   └── grok_lm.py            # LLM loader (already implemented)
+    ├── ui/
+    │   └── streamlit/ # Streamlit UI modules (load_ui.py etc.)
+    └── main.py # Orchestration entry (calls GraphBuilder)
+
+
+
+---
+
+## Class: `BasicChatbotNode`
+
+### Purpose
+Encapsulate the minimal chatbot logic used by the graph node: use the lLM to reply to messages stored in `state`.
+
+### Constructor
+
+```python
+def __init__(self, model):
+    self.lm = model
+```
+
+
+- `model` is the already-loaded LLM instance passed from the GraphBuilder (e.g., `GroqLLM.get_models()` result).
+
+- Store the model on the node instance for use in `process()`.
+
+## Method: `process(self, state:State) -> dict:`
+
+- Inputs:
+        - `state` — the shared state object which contains `messages` (a list or deque).
+
+- Behavior:
+        - Read the conversation/messages from state (the messages field).
+        - Invoke the LM with the state.messages as input (example: self.lm.invoke(state.messages)).
+        - Receive the LM response.
+        - Append the response to state.messages (use reducers if available so updates append rather than replace).
+        - Return the messages (or a dict containing the new messages) so the graph/end node can use them.
+- Return `type: dict` (returning in dictionary form; keyed by `messages`).
+- The node is simple: it takes input (from state) and returns a response by invoking the LLM.
+
+## How the Node Is Registered with GraphBuilder:
+
+- In `graph_builder.py`, after creating the graph and initializing self.llm, the `BasicChatbotNode` is imported and instantiated:
+
+```python
+from src.langgraphagenticai.nodes.basic_chatbot_node import BasicChatbotNode
+self.basic_chatbot_node = BasicChatbotNode(self.llm)
+```
+
+- When building the basic chatbot graph (`basic_chatbot_build_graph()`), the node is registered and wired:
+
+```python
+self.graph_builder.add_node("chatbot", func=self.basic_chatbot_node.process)
+self.graph_builder.add_edge(START, "chatbot")
+self.graph_builder.add_edge("chatbot", END)
+```
+
+- During execution the graph calls chatbot node's process(state) using the shared state and the node returns the response.
+
+## State Interaction:
+
+- state is defined in `src/landgraf_agentic_ai/state/state.py` and contains a `messages` collection (list / deque).
+
+- Node updates should **append** to `messages`. The reducers append-only updates the list (not replacement).
+
+- Always pass `state` into `process()` so node can read and mutate shared conversation context.
+
+## Error Handling & Validation
+
+- Nodes should assume the LLM is already loaded by the time `process` is called (GraphBuilder passes the LLM to node during initialization).
+
+- Node implementations should include minimal exception handling around LLM invocation to raise clear errors if LLM calls fail (e.g., catch exceptions and raise a ValueError or return an error message in the output dict).
+
+## Execution Flow (end-to-end recap)
+
+- **UI** collects `user_controls` (selected LLM, model, API key, message).
+- **LLM loader** initializes the model and returns an LLM instance.
+- **GraphBuilder** is instantiated with the LM and state.
+- **GraphBuilder** registers nodes (including `BasicChatbotNode`) and edges.
+- **Main** triggers graph execution on user input:
+        - Graph invokes the `chatbot` node's `process(state)`
+        - Node calls LLM, updates `state.messages`, returns messages
+        - End node finalizes execution; `display_result` renders output in UI
+-------------------------------------------------------------------
