@@ -1,4 +1,4 @@
-from langgraphagenticai.state import State
+from src.langgraphagenticai.state.state import State
 
 class BasicChatbotNode():
     """
@@ -9,6 +9,12 @@ class BasicChatbotNode():
 
     def process(self, state:State) -> dict:
         """
-        Process the input state and generate a chatbot response."""
+        Process the input state and generate a chatbot response.
+        """
         # For demonstration purposes, this chatbot simply echoes the input text.
-        return {"message": self.llml.invoke(state["messages"])}
+
+        messages = state["messages"]
+        response = self.llm.invoke(messages)
+        messages.append(response)
+
+        return {"messages": messages}

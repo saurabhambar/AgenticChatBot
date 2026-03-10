@@ -12,12 +12,14 @@ class DisplayResultStreamlit:
         usecase=self.usecase
         graph=self.graph
         user_message=self.user_message
-        if usecase == "basic_chatbot":
-            for event in graph.stream({'message':user_message}):
+        print(usecase, graph, user_message)
+        if usecase == "Basic ChatBot":
+            for event in graph.stream({"messages": [HumanMessage(content=user_message)]}):
                 print(event.values())
                 for value in event.values():
-                    print(value['message'])
+                    print(value['messages'])
+                    response = value["messages"][-1]
                     with st.chat_message("user"):   
                         st.write(user_message)
                     with st.chat_message("assistant"):
-                        st.write(value['message'].content)
+                        st.write(response.content)

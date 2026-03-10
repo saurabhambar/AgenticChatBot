@@ -14,6 +14,7 @@ class LoadStreamlitUI():
         with st.sidebar:
             llm_option = self.config.get_llm_option()
             usecase_options = self.config.get_usecase_option()
+            print(llm_option, usecase_options)
 
             # LLM Option
             self.user_controls["selected_llm"] = st.selectbox("Select LLM",llm_option)
@@ -29,5 +30,6 @@ class LoadStreamlitUI():
 
             # UseCase Selection 
             self.user_controls["selected_usecases"] = st.selectbox("Select Usecases", usecase_options)
+            print(self.user_controls)
         
         return self.user_controls

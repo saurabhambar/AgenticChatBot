@@ -16,6 +16,7 @@ def load_langgraph_agenticai_app():
     # 1. Load UI and collect user_controls
     ui = LoadStreamlitUI()
     user_input = ui.load_streamlit_ui()
+    print(user_input)
 
     if not user_input:
         st.error("Error: Failed to load user input from UI.")
@@ -23,6 +24,7 @@ def load_langgraph_agenticai_app():
     
     # 2. Wait for user message input (Streamlit chat_input)
     user_message = st.chat_input("Enter your message:")
+    print(f"User Message: {user_message}")
 
     if user_message:
         try:
@@ -36,7 +38,8 @@ def load_langgraph_agenticai_app():
             
             # 4. Identify use case (e.g., "basic_chatbot")
             # Initialize and setup the graph based on use case
-            usecase = user_input.get("selected_usecase")
+            usecase = user_input.get("selected_usecases")
+            print(usecase)
             if not usecase:
                 st.error("Error: No use case selected.")
                 return
