@@ -645,9 +645,8 @@ src/
   - Returns output (usually the messages) for downstream consumption
 - Ensure the node is modular and easily reusable by the GraphBuilder.
 
----
-
 ## File Location:
+
 ```
 src/
 └── landgraf_agentic_ai/
@@ -664,12 +663,10 @@ src/
     │   ├── init.py
     │   └── grok_lm.py            # LLM loader (already implemented)
     ├── ui/
-    │   └── streamlit/ # Streamlit UI modules (load_ui.py etc.)
+    │   └── streamlit/            # Streamlit UI modules (load_ui.py etc.)
     └── main.py # Orchestration entry (calls GraphBuilder)
 ```
 
-
----
 
 ## Class: `BasicChatbotNode`
 
@@ -745,4 +742,113 @@ self.graph_builder.add_edge("chatbot", END)
         - Graph invokes the `chatbot` node's `process(state)`
         - Node calls LLM, updates `state.messages`, returns messages
         - End node finalizes execution; `display_result` renders output in UI
+-------------------------------------------------------------------
+
+# Pipeline Integration
+
+## Overview
+
+- This section documents how the individual modules (UI, LLM loader, GraphBuilder, Nodes, State) are integrated into a **single pipeline** that is triggered from `main.py` and started via `app.py`. The integration ensures that when a user submits a message from the Streamlit UI, the system:
+
+1. Loads / validates the selected LLM and API key.
+2. Instantiates the GraphBuilder with the loaded LLM and shared state.
+3. Builds the requested use-case graph (e.g., Basic Chatbot).
+4. Executes the graph pipeline (Start → Nodes → End).
+5. Streams and renders results to the UI.
+
+
+## Goal
+
+Provide a clear, step-by-step integration plan and technical definition for `main.py` (pipeline orchestrator) and `display_result.py` (UI renderer).
+
+
+## File Map (integration-relevant)
+
+
+```
+AGENTICCHATBOT/
+├── app.py                               # Entrypoint (streamlit run app.py)
+└── src/
+    ├── init.py     
+    └── landgraphagenticai/
+        └── main.py                       # Orchestration entry (calls GraphBuilder)
+        └──graph/
+        │  ├── init.py
+        │  └── graph_builder.py           # GraphBuilder wires nodes into the graph
+        ├── state/
+        │   ├── init.py
+        │   └── state.py                  # Shared state definition (message list, reducers)
+        ├── nodes/
+        │   ├── init.py
+        │   └── basic_chatbot_node.py     # Node implementation (this module)
+        ├── llms/
+        │   ├── init.py
+        │   └── grok_lm.py                # LLM loader (already implemented)
+        ├── ui/
+        │   └── streamlit/                # Streamlit UI modules (load_ui.py etc.)
+        │   │   ├── load_ui.py            # Builds sidebar controls -> returns user_controls
+        │   │   └── display_result.py     # Renders streaming results to UI
+```
+
+## `main.py` — Pipeline Orchestrator (technical definition)
+
+**Purpose:** glue together UI → LLM loader → GraphBuilder → Node execution → UI render.
+
+## Notes & details:
+
+- `user_controls` comes from `LoadStreamlitUI().load_streamlit_ui()` and contains `selected_lm`, `selected_model`, `grok_api_key`, `selected_usecase`, etc.
+- `GrokLM` (or other LLM loaders) must accept `user_controls` and return an initialized LLM instance (or raise/return error).
+- `GraphBuilder` is initialized with the LLM instance: `GraphBuilder(model=lm)`.
+- `GraphBuilder.setup_graph(use_case)` decides which graph-building method to call (e.g., basic_chatbot_build_graph()).
+- `GraphBuilder.execute(payload)` runs the graph (start → nodes → end) and returns final output (or streams intermediate responses).
+- Wrap major steps in `try/except` blocks and display errors to UI via st.error(...).
+
+## `display_result.py` — UI Rendering (technical definition)
+
+- render results returned by graph execution into the Streamlit UI in human-friendly format and stream intermediate messages where applicable
+- Responsibilities:
+        - Accept these parameters in constructor:
+                - `use_case` (string)
+                - `graph` or `graph_builder` (so it can inspect outputs / status)
+                - `user_message` (the input that triggered execution)
+        - Provide method `display_result_on_ui(result)` which:
+                - For basic_chatbot use-case – streams assistant messages back to the page.
+                - Formats each returned message (role/metadata/timestamp) and writes it in Streamlit (e.g., `st.write`, `st.chat_message` or `st.markdown`).
+                - Uses `langchain/langgraph` message wrappers where helpful (e.g., `HumanMessage`, `AIMessage`) for consistent display.
+- `display_result_on_ui` must handle both synchronous return values and streaming outputs depending on how `GraphBuilder.execute()` is implemented.
+
+## GraphBuilder: `setup_graph(use_case)` 
+
+- `setup_graph(use_case: str)` is a dispatcher that calls the appropriate builder:
+        - if `use_case == "basic_chatbot": self.basic_chatbot_build_graph()`
+        - Additional cases for `chatbot_with_tools`, `ai_news`, etc.
+- This enables a modular pattern: add a new use-case graph by adding a builder method and registering it in `setup_graph`.
+
+
+## Execution / Run Command
+
+- Start the application
+
+```bash
+streamlit run src/landgraf_agentic_ai/app.py
+```
+
+## Error Handling & UX Considerations
+
+- Fail early: if LLM cannot be initialized, show `st.error("LM model could not be initialized.")` and abort the pipeline run.
+- When graph setup fails: display `st.error(f"Graph setup failed: {e}")`.
+- Pipeline-level exceptions are caught and surfaced via `st.error`.
+- Provide helpful UI hints (e.g., missing API key) before running the pipeline.
+
+## Data Flow Summary (end-to-end)
+
+- UI (`LoadStreamlitUI`) → returns user_controls.
+- User enters message via Streamlit chat input.
+- main.py receives message and:
+        - Initializes LLM loader with user_controls.
+        - Loads model via `get_models()`.
+        - Initializes `GraphBuilder(model)`.
+        - Calls `GraphBuilder.setup_graph(use_case)`.
+        - Executes graph: `GraphBuilder.execute(payload=user_message)`.
+- `display_result.py` renders results returned by graph execution to the UI.
 -------------------------------------------------------------------
